@@ -1,0 +1,245 @@
+<div class="apidocDiv">
+<style>
+/*csslint
+*/
+.apidocDiv {
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.apidocDiv a[href] {
+    color: #33f;
+    font-weight: bold;
+    text-decoration: none;
+}
+.apidocDiv a[href]:hover {
+    text-decoration: underline;
+}
+.apidocCodeCommentSpan {
+    background: #bbf;
+    color: #000;
+    display: block;
+}
+.apidocCodeKeywordSpan {
+    color: #d00;
+    font-weight: bold;
+}
+.apidocCodePre {
+    background: #eef;
+    border: 1px solid;
+    color: #777;
+    padding: 5px;
+    white-space: pre-wrap;
+}
+.apidocFooterDiv {
+    margin-top: 20px;
+    text-align: center;
+}
+.apidocModuleLi {
+    margin-top: 10px;
+}
+.apidocSectionDiv {
+    border-top: 1px solid;
+    margin-top: 20px;
+}
+.apidocSignatureSpan {
+    color: #777;
+    font-weight: bold;
+}
+</style>
+<h1>api documentation for
+    <a
+
+    >elm-live (v2.7.4)</a>
+</h1>
+<h4>A flexible dev server for Elm. Live reload included!</h4>
+<div class="apidocSectionDiv"><a
+    href="#apidoc.tableOfContents"
+    id="apidoc.tableOfContents"
+><h1>table of contents</h1></a><ol>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.elm-live">module elm-live</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.elm-live.elm-live">
+            function <span class="apidocSignatureSpan"></span>elm-live
+            <span class="apidocSignatureSpan">(argv, options)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+</ol></div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.elm-live" id="apidoc.module.elm-live">module elm-live</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.elm-live.elm-live" id="apidoc.element.elm-live.elm-live">
+        function <span class="apidocSignatureSpan"></span>elm-live
+        <span class="apidocSignatureSpan">(argv, options)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">(argv, options) =&#x3e; {
+  const chalk = require(&#x27;chalk&#x27;);
+  const packageJson = require(&#x27;../package.json&#x27;);
+  const parseArgs = require(&#x27;./parse-args&#x27;);
+
+  const outputStream = options.outputStream;
+  const inputStream = options.inputStream;
+  const args = parseArgs(argv);
+
+  const SUCCESS = 0;
+  const FAILURE = 1;
+  const bold = chalk.bold;
+  const dim = chalk.dim;
+
+  // Output version
+  if (args.version) {
+    outputStream.write(`${bold(&#x27;elm-live&#x27;)} v${packageJson.version}\n`);
+    return SUCCESS;
+  }
+
+  const path = require(&#x27;path&#x27;);
+  const fs = require(&#x27;fs&#x27;);
+  const spawnSync = require(&#x27;cross-spawn&#x27;).sync;
+  const hasbinSync = require(&#x27;hasbin&#x27;).sync;
+
+  // Display help
+  if (args.help) {
+    if (hasbinSync(&#x27;man&#x27;)) {
+      const manpagePath =
+        path.resolve(__dirname, &#x27;../manpages/elm-live.1&#x27;);
+      const manProcess =
+        spawnSync(&#x27;man&#x27;, [manpagePath], { stdio: [
+          inputStream, outputStream, outputStream,
+        ] });
+
+      if (manProcess.error) throw manProcess.error;
+    } else {
+      const fallbackPath =
+        path.resolve(__dirname, &#x27;../manpages/elm-live.1.txt&#x27;);
+      const plainTextHelp =
+        fs.readFileSync(fallbackPath, &#x27;utf8&#x27;);
+      outputStream.write(plainTextHelp);
+    }
+
+    return SUCCESS;
+  }
+
+  const indent = require(&#x27;indent-string&#x27;);
+  const budo = require(&#x27;budo&#x27;);
+  const chokidar = require(&#x27;chokidar&#x27;);
+  const debounce = require(&#x27;./debounce&#x27;);
+
+  const auxiliaryBuild = (execPath) =&#x3e; {
+    if (!execPath) {
+      return { fatal: false, exitCode: SUCCESS };
+    }
+
+    const process = spawnSync(execPath, [], {
+      stdio: [inputStream, outputStream, outputStream],
+    });
+
+    if (process.error &#x26;&#x26; process.error.code === &#x27;ENOENT&#x27;) {
+      outputStream.write(
+`\n${dim(&#x27;elm-live:&#x27;)}
+  I can’t find the command ${bold(execPath)}!
+  Please make sure you can call ${bold(execPath)}
+  from your command line.
+
+`
+      );
+
+      return { fatal: true, exitCode: FAILURE };
+    } else if (process.error) {
+      outputStream.write(
+`\n${dim(&#x27;elm-live:&#x27;)} Error while calling ${bold(execPath)}! This output may be helpful:
+${indent(String(process.error), 2)}
+
+`
+      );
+    }
+
+    if (args.recover &#x26;&#x26; process.status !== SUCCESS) outputStream.write(
+`\n${dim(&#x27;elm-live:&#x27;)}
+  ${bold(execPath)} failed! You can find more info above. Keep calm and take your time
+  to check why the command is failing. We’ll try to run it again as soon as you change an Elm file.
+
+`
+    );
+
+    return { fatal: false, exitCode: process.status };
+  };
+
+  // Build logic
+  const build = () =&#x3e; {
+    const beforeBuild = auxiliaryBuild(args.beforeBuild);
+    if (beforeBuild.exitCode !== SUCCESS) {
+      return beforeBuild;
+    }
+
+    const elmMake = spawnSync(args.pathToElmMake, args.elmMakeArgs, {
+      stdio: [inputStream, outputStream, outputStream],
+    });
+
+    if (elmMake.error &#x26;&#x26; elmMake.error.code === &#x27;ENOENT&#x27;) {
+      outputStream.write(
+`\n${dim(&#x27;elm-live:&#x27;)}
+  I can’t find the command ${bold(args.pathToElmMake)}!
+  Looks like ${bold(&#x27;elm-platform&#x27;)} isn’t installed. Make sure you’ve followed
+  the steps at https://git.io/elm-platform and that you can call
+  ${bold(args.pathToElmMake)} from your command line.
+
+  If that fails, have a look at open issues:
+  https://github.com/tomekwi/elm-live/issues .
+
+`
+      );
+
+      return { fatal: true, exitCode: FAILURE };
+    } else if (elmMake.error) {
+      outputStream.write(
+`\n${dim(&#x27;elm-live:&#x27;)} Error while calling ${bold(&#x27;elm-make&#x27;)}! This output may be helpful:
+${indent(String(elmMake.error), 2)}
+
+`
+      );
+    }
+
+    if (args.recover &#x26;&#x26; elmMake.status !== SUCCESS) outputStream.write(
+`\n${dim(&#x27;elm-live:&#x27;)}
+  ${bold(&#x27;elm-make&#x27;)} failed! You can find more info above. Keep calm and take your time
+  to fix your code. We’ll try to compile it again as soon as you change a file.
+
+`
+    );
+
+    const afterBuild = auxiliaryBuild(args.afterBuild);
+    if (afterBuild.exitCode !== SUCCESS) {
+      return afterBuild;
+    }
+
+    return { fatal: false, exitCode: elmMake.status };
+  };
+
+  // Server logic
+  let serverStarted;
+  const startServer = () =&#x3e; {
+    outputStream.write(
+`\n${ ...</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocFooterDiv">
+    [ this document was created with
+    <a href="https://github.com/kaizhu256/node-utility2" target="_blank">utility2</a>
+    ]
+</div>
+</div>
